@@ -1,0 +1,95 @@
+// ===============================================================
+// قواعد أمان فايربيس فايرستور (Firebase Firestore Security Rules)
+// متجر مكة للأدوات الكهربائية
+// ===============================================================
+// قم بنسخ هذا المحتوى ولصقه في Firebase Console -> Firestore Database -> Rules
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // دالة للتحقق من هوية المشرف (Admin)
+    function isAdmin() {
+      return request.auth != null && 
+             request.auth.token.email == "macaelctrec@gmail.com";
+    }
+
+    // 1. المنتجات (Products)
+    // القراءة متاحة للجميع (الزوار والعملاء)
+    // الإضافة والتعديل والحذف متاحة للمشرف فقط
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 2. المقالات والمدونة (Articles)
+    // القراءة متاحة للجميع
+    // الإضافة والتعديل والحذف متاحة للمشرف فقط
+    match /articles/{articleId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 3. إعدادات الموقع والهوية (Config: branding, homepage, top_bar)
+    // القراءة متاحة للجميع لعرض الشعار والبنرات
+    // التعديل والحفظ للمشرف فقط
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 4. إحصائيات الموقع وعداد الزوار (Site Stats)
+    // القراءة متاحة للجميع
+    // السماح فقط بزيادة حقل العداد بواحد للزوار الجدد
+    match /site_stats/{statId} {
+      allow read: if true;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+                    || isAdmin();
+      allow create, delete: if isAdmin();
+    }
+
+    // 5. رسائل نموذج التواصل (Contacts)
+    // يمكن لأي زائر إرسال رسالة بشرط توفر الحقول الأساسية وتكون غير فارغة
+    // القراءة والحذف للمشرف فقط لحماية خصوصية العملاء
+    match /contacts/{contactId} {
+      allow create: if request.resource.data.name is string 
+                    && request.resource.data.name.size() > 1
+                    && request.resource.data.phone is string 
+                    && request.resource.data.phone.size() >= 10
+                    && request.resource.data.message is string 
+                    && request.resource.data.message.size() > 2;
+      allow read, delete, update: if isAdmin();
+    }
+
+    // 6. سجل الطلبات والدفع اليدوي (Orders)
+    match /orders/{orderId} {
+      // 1. السماح للعملاء بإنشاء طلب جديد بالحالة المبدئية المعلقة فقط
+      allow create: if request.resource.data.orderNumber is string
+                    && request.resource.data.customer.name is string
+                    && request.resource.data.customer.phone is string
+                    && request.resource.data.orderStatus == 'pending_review'
+                    && request.resource.data.paymentStatus == 'pending_review'
+                    && request.resource.data.paymentProof.screenshotUrl is string;
+
+      // 2. السماح للمشرف بالقراءة الكاملة، وللعميل بقراءة طلبه الفردي للتتبع
+      allow read: if isAdmin() || (resource.data.orderNumber is string);
+
+      // 3. التعديل للمشرف، مع استثناء للعميل لإعادة رفع إثبات الدفع فقط في حال الرفض
+      allow update: if isAdmin() || (
+        resource.data.orderStatus == 'payment_rejected' &&
+        request.resource.data.orderStatus == 'payment_review' &&
+        request.resource.data.paymentStatus == 'pending_review' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentProof', 'paymentStatus', 'orderStatus', 'statusHistory', 'updatedAt'])
+      );
+
+      // 4. الحذف مقتصر على المشرف فقط
+      allow delete: if isAdmin();
+    }
+
+    // إغلاق أي مجموعة أخرى بشكل افتراضي
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

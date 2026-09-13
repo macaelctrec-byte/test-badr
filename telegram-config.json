@@ -1,0 +1,10 @@
+{
+  "botToken": "8873600109:AAHzCV12VhTMlQaNgBUyjEWihvoe5SKOFJ8",
+  "adminChatId": "8255156756",
+  "allowedChatIds": [
+    "8255156756"
+  ],
+  "apiSecret": "macca_telegram_secret_key_2026",
+  "googleAppsScriptUrl": "https://script.google.com/macros/s/AKfycby-g5O-K-s_Fjbv3AAjpMWJU3Bv1QhcGKADua0s6hOIm5epuv0puMT_-Q1PKgCtKJN8/exec",
+  "storeUrl": "https://macca3.shop"
+}
